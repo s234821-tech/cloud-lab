@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: ./server
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGODB_URI=mongodb+srv://Duong:Duong123@cluster0.2yse9ai.mongodb.net/cloud_lab?appName=Cluster0
+
+  frontend:
+    build: ./client
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend

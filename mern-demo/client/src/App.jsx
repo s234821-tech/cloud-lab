@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// !!! QUAN TRỌNG: Thay bằng URL Forwarded Port 5000 của bạn !!!
-const API_URL = 'https://stunning-meme-r7549rx5v77f5w75-5000.app.github.dev/api/students';
+// URL kết nối tới backend server chạy ở localhost:5000
+const API_URL = 'http://localhost:5000/api/students';
 
 function App() {
   const [students, setStudents] = useState([]);
@@ -12,6 +12,7 @@ function App() {
     name: '',
     email: ''
   });
+  const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,8 +22,8 @@ function App() {
       const res = await axios.get(API_URL);
       setStudents(res.data);
       setError('');
-    } catch (error) {
-      console.error('Lỗi tải danh sách:', error);
+    } catch (err) {
+      console.error('Lỗi tải danh sách:', err);
       setError('Không thể kết nối đến server backend.');
     }
   };
@@ -35,20 +36,80 @@ function App() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Gửi dữ liệu tạo sinh viên mới
+  // 1. Nút SỬA: Đưa thông tin sinh viên được chọn lên Form
+  const handleEdit = (student) => {
+    setEditingId(student._id);
+    setFormData({
+      studentId: student.studentId,
+      name: student.name,
+      email: student.email
+    });
+    setError('');
+  };
+
+  // Hủy chế độ chỉnh sửa
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setFormData({ studentId: '', name: '', email: '' });
+  };
+
+  // 2. Nút CẬP NHẬT: Thực hiện cập nhật sinh viên
+  const handleUpdateStudent = async (targetId = null) => {
+    const idToUpdate = targetId || editingId;
+    if (!idToUpdate) {
+      alert('⚠️ Vui lòng bấm nút "Sửa" sinh viên cần cập nhật trước!');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await axios.put(`${API_URL}/${idToUpdate}`, formData);
+      alert('🎉 Cập nhật sinh viên thành công!');
+      setFormData({ studentId: '', name: '', email: '' });
+      setEditingId(null);
+      fetchStudents();
+    } catch (err) {
+      alert('❌ Lỗi cập nhật: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Gửi form (Thêm mới hoặc Cập nhật)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (editingId) {
+      await handleUpdateStudent(editingId);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       await axios.post(API_URL, formData);
-      setFormData({ studentId: '', name: '', email: '' }); // Xóa form
-      fetchStudents(); // Tải lại danh sách
+      setFormData({ studentId: '', name: '', email: '' });
+      fetchStudents();
       alert('🎉 Thêm sinh viên thành công!');
-    } catch (error) {
-      alert('❌ Lỗi: ' + (error.response?.data?.message || error.message));
+    } catch (err) {
+      alert('❌ Lỗi: ' + (err.response?.data?.message || err.message));
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Nút Xóa sinh viên
+  const handleDelete = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa sinh viên này?')) return;
+    try {
+      await axios.delete(`${API_URL}/${id}`);
+      alert('🗑️ Xóa sinh viên thành công!');
+      if (editingId === id) {
+        handleCancelEdit();
+      }
+      fetchStudents();
+    } catch (err) {
+      alert('❌ Lỗi xóa: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -56,7 +117,7 @@ function App() {
     // Container chính với nền xám nhạt
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       <div className="container mx-auto px-4 py-10 max-w-5xl">
-        
+
         {/* Tiêu đề chính */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold text-blue-800 tracking-tight">
@@ -67,19 +128,28 @@ function App() {
 
         {/* Bố cục 2 cột trên màn hình lớn */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          
+
           {/* CỘT 1: FORM NHẬP LIỆU (Chiếm 1/3) */}
           <div className="md:col-span-1">
-            <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 sticky top-10">
+            <div className={`bg-white p-8 rounded-2xl shadow-lg border transition-all sticky top-10 ${editingId ? 'border-amber-400 ring-2 ring-amber-100' : 'border-gray-100'}`}>
               <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-                Thêm Sinh Viên Mới
+                {editingId ? (
+                  <>
+                    <span className="text-amber-500">✏️</span> Cập Nhật Sinh Viên
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Thêm Sinh Viên Mới
+                  </>
+                )}
               </h2>
-              
+
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div><label className="block text-sm font-semibold text-gray-700 mb-1">Mã sinh viên (MSSV)</label>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Mã sinh viên (MSSV)</label>
                   <input
                     type="text"
                     name="studentId"
@@ -90,7 +160,7 @@ function App() {
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Họ và Tên</label>
                   <input
@@ -103,7 +173,7 @@ function App() {
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Email sinh viên</label>
                   <input
@@ -116,28 +186,42 @@ function App() {
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition"
                   />
                 </div>
-                
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`w-full flex justify-center items-center gap-2 px-6 py-3 text-white font-bold rounded-lg transition duration-150 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
-                >
-                  {loading ? (
+
+                <div className="space-y-2">
+                  {editingId ? (
                     <>
-                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Đang xử lý...
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className={`w-full flex justify-center items-center gap-2 px-6 py-3 text-white font-bold rounded-lg transition duration-150 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 shadow-md hover:shadow-lg'}`}
+                      >
+                        {loading ? 'Đang xử lý...' : '💾 Cập Nhật Sinh Viên'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="w-full py-2.5 px-4 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold transition text-sm"
+                      >
+                        ✖ Hủy Chỉnh Sửa
+                      </button>
                     </>
-                  ) : 'Thêm Vào Danh Sách'}
-                </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className={`w-full flex justify-center items-center gap-2 px-6 py-3 text-white font-bold rounded-lg transition duration-150 ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+                    >
+                      {loading ? 'Đang xử lý...' : 'Thêm Vào Danh Sách'}
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
           </div>
 
           {/* CỘT 2: DANH SÁCH HIỂN THỊ (Chiếm 2/3) */}
-          <div className="md:col-span-2"><div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="md:col-span-2">
+            <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -168,12 +252,13 @@ function App() {
                       <th className="px-6 py-4 text-xs font-bold text-gray-600 uppercase tracking-wider">MSSV</th>
                       <th className="px-6 py-4 text-xs font-bold text-gray-600 uppercase tracking-wider">Họ và Tên</th>
                       <th className="px-6 py-4 text-xs font-bold text-gray-600 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-4 text-xs font-bold text-gray-600 uppercase tracking-wider text-center">Thao Tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
                     {students.length === 0 && !error ? (
                       <tr>
-                        <td colSpan="3" className="px-6 py-16 text-center text-gray-500">
+                        <td colSpan="4" className="px-6 py-16 text-center text-gray-500">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 012 2v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5a2 2 0 012-2m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                           </svg>Chưa có dữ liệu sinh viên nào được thêm.
@@ -181,10 +266,36 @@ function App() {
                       </tr>
                     ) : (
                       students.map((st, index) => (
-                        <tr key={st._id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                        <tr
+                          key={st._id}
+                          className={`${editingId === st._id ? 'bg-amber-50 ring-2 ring-amber-300' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}
+                        >
                           <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-blue-700 font-medium">{st.studentId}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{st.name}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{st.email}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                            <div className="flex justify-center items-center gap-2">
+                              {/* NÚT SỬA */}
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(st)}
+                                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-semibold text-xs transition flex items-center gap-1 shadow-sm"
+                                title="Sửa thông tin sinh viên này"
+                              >
+                                ✏️ Sửa
+                              </button>
+
+                              {/* NÚT XÓA */}
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(st._id)}
+                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold text-xs transition flex items-center gap-1 shadow-sm"
+                                title="Xóa sinh viên"
+                              >
+                                🗑️ Xóa
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     )}
