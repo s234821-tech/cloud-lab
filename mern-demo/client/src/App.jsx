@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// URL kết nối tới backend server chạy ở localhost:5000
-const API_URL = 'http://localhost:5000/api/students';
+// URL kết nối tới backend server (dùng biến môi trường cho production)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/students';
 
 function App() {
   const [students, setStudents] = useState([]);
