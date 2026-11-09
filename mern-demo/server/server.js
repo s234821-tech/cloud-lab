@@ -5,6 +5,17 @@ require('dotenv').config();
 
 const app = express();
 
+// HTTP request logging
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    console.log(
+      `${req.method} ${req.path} ${res.statusCode} ${Date.now() - startedAt}ms`
+    );
+  });
+  next();
+});
+
 // Cấu hình CORS linh hoạt cho Production
 const allowedOrigins = [
   process.env.CLIENT_URL,
@@ -18,7 +29,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
-      callback(null, true);
+      callback(null, false);
     }
   },
   credentials: true
